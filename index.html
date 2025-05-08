@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Customer Satisfaction Key Drivers Analysis</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap');
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Montserrat', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1rem;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+    header h1 {
+      font-weight: 700;
+      font-size: 1.8rem;
+      margin-bottom: 0.25rem;
+    }
+    header p {
+      font-weight: 400;
+      font-size: 1rem;
+      opacity: 0.85;
+    }
+    main {
+      background: rgba(255, 255, 255, 0.1);
+      max-width: 600px;
+      width: 100%;
+      border-radius: 12px;
+      padding: 1rem 1.5rem 2rem;
+      box-shadow: 0 8px 24px rgb(0 0 0 / 0.15);
+      user-select: none;
+    }
+    label {
+      display: block;
+      font-weight: 600;
+      margin: 1rem 0 0.5rem;
+      font-size: 1rem;
+      color: #d1d1e9;
+    }
+    textarea {
+      width: 100%;
+      min-height: 120px;
+      border-radius: 6px;
+      border: none;
+      resize: vertical;
+      padding: 0.75rem;
+      font-size: 1rem;
+      font-family: monospace;
+      outline: none;
+      box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.25);
+    }
+    input[type="file"] {
+      color: #444;
+      margin-top: 0.5rem;
+    }
+    button {
+      margin-top: 1.5rem;
+      background: #ff6f61;
+      border: none;
+      padding: 0.75rem 1.25rem;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 1rem;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(255, 111, 97, 0.6);
+      transition: background-color 0.3s ease;
+      width: 100%;
+    }
+    button:hover, button:focus {
+      background: #ff3b2e;
+    }
+    #results {
+      margin-top: 2rem;
+      color: #fff;
+    }
+    h2 {
+      font-weight: 700;
+      border-bottom: 2px solid #ff6f61;
+      padding-bottom: 0.25rem;
+      margin-bottom: 1rem;
+    }
+    ul {
+      list-style: none;
+      padding-left: 0;
+    }
+    li {
+      background: rgba(255, 255, 255, 0.15);
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      margin-bottom: 0.75rem;
+      display: flex;
+      justify-content: space-between;
+    }
+    .attr-name {
+      font-weight: 600;
+      font-size: 1rem;
+    }
+    .attr-corr {
+      font-weight: 700;
+      font-size: 1rem;
+      color: #ffd966;
+    }
+    canvas {
+      margin-top: 1rem;
+      border-radius: 12px;
+      background: rgba(0, 0, 0, 0.15);
+      display: block;
+      max-width: 100%;
+      height: auto;
+    }
+    @media (max-width: 420px) {
+      main { padding: 1rem; max-width: 100%; }
+      header h1 { font-size: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Customer Satisfaction Key Drivers Analysis</h1>
+    <p>Upload or paste survey data (CSV) to identify key drivers of customer satisfaction.</p>
+  </header>
+  <main>
+    <label for="csvInput">Paste CSV data here (or upload a CSV file below):</label>
+    <textarea id="csvInput" placeholder="Example CSV format: CustomerID,ProductQuality,Support,Satisfaction,Price
+1,8,7,9,5
+2,9,6,8,6
+3,6,9,7,7"></textarea>
+
+    <label for="csvFile">Upload CSV file:</label>
+    <input type="file" id="csvFile" accept=".csv,text/csv" />
+
+    <button id="analyzeBtn">Analyze Key Drivers</button>
+    <section id="results" aria-live="polite" aria-atomic="true" aria-relevant="all"></section>
+  </main>
+
+  <script>
+    function parseCSV(csvText) {
+      const lines = csvText.trim().split(/\r?\n/);
+      const headers = lines[0].split(',').map(h => h.trim());
+      const data = lines.slice(1).map(line => {
+        const values = line.split(',').map(val => parseFloat(val.trim()));
+        return headers.reduce((obj, key, idx) => {
+          obj[key] = values[idx];
+          return obj;
+        }, {});
+      });
+      return { headers, data };
+    }
+
+    function correlation(x, y) {
+      const n = x.length;
+      const avgX = x.reduce((a, b) => a + b, 0) / n;
+      const avgY = y.reduce((a, b) => a + b, 0) / n;
+      const cov = x.reduce((sum, xi, i) => sum + (xi - avgX) * (y[i] - avgY), 0);
+      const stdX = Math.sqrt(x.reduce((sum, xi) => sum + (xi - avgX) ** 2, 0));
+      const stdY = Math.sqrt(y.reduce((sum, yi) => sum + (yi - avgY) ** 2, 0));
+      return cov / (stdX * stdY);
+    }
+
+    function calculateCorrelations(data, targetKey) {
+      const keys = Object.keys(data[0]).filter(k => k !== targetKey);
+      const targetValues = data.map(row => row[targetKey]);
+      return keys.map(key => {
+        const x = data.map(row => row[key]);
+        return { key, corr: correlation(x, targetValues) };
+      }).sort((a, b) => Math.abs(b.corr) - Math.abs(a.corr));
+    }
+
+    function displayResults(results) {
+      const resultsDiv = document.getElementById('results');
+      resultsDiv.innerHTML = `
+        <h2>Top Key Drivers</h2>
+        <ul>
+          ${results.map(r => `
+            <li>
+              <span class="attr-name">${r.key}</span>
+              <span class="attr-corr">${r.corr.toFixed(2)}</span>
+            </li>
+          `).join('')}
+        </ul>
+      `;
+    }
+
+    document.getElementById('analyzeBtn').addEventListener('click', async () => {
+      const textarea = document.getElementById('csvInput');
+      const fileInput = document.getElementById('csvFile');
+      let csvText = textarea.value.trim();
+
+      if (!csvText && fileInput.files.length > 0) {
+        csvText = await fileInput.files[0].text();
+      }
+
+      if (!csvText) {
+        alert('Please provide CSV data.');
+        return;
+      }
+
+      try {
+        const { headers, data } = parseCSV(csvText);
+        const satisfactionKey = headers.find(h => /satisfaction/i.test(h)) || headers[headers.length - 1];
+        const results = calculateCorrelations(data, satisfactionKey);
+        displayResults(results);
+      } catch (err) {
+        alert('Error processing CSV: ' + err.message);
+      }
+    });
+  </script>
+</body>
+</html>
